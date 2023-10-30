@@ -1,0 +1,113 @@
+sources:
+  - type: spark
+    name: spark_cloud_329
+    parametres:
+      spark_conf_paramenres:
+        spark.executor.memory: "1g"
+        spark.driver.memory: "1g"
+        spark.executor.instances: "1"
+        spark.yarn.queue: "example_queue" # Необходимо указать очередб команды из yarn
+      vault_parametres:
+        path: "dq/spark_cloud_329"
+        user: "username"
+      cluster: "cloud_329"
+    owners: 'savitskiyov'
+    product: DQ
+  - type: spark
+    name: spark_cloud_329_2
+    jira_project: 'DQP'
+    parametres:
+      spark_conf_paramenres:
+        spark.executor.memory: "2g"
+        spark.driver.memory: "2g"
+        spark.executor.instances: "1"
+        spark.yarn.queue: "example_queue" # Необходимо указать очередб команды из yarn
+      vault_parametres:
+        path: "dq/spark_cloud_329"
+        user: "username2"
+      cluster: "cloud_329"
+    owners: ['savitskiyov', 'Big Data']
+
+
+parametres:
+  spark_conf_paramenres:
+    spark.executor.memory: "2g"
+  vault_parametres:
+    path: "dq/spark_cloud_329"
+    user: "username"
+  cluster: "cloud_329"
+
+
+check_objects:
+  - name: test_objects1
+    source: spark_source
+    database: dqfw_test
+    table: simple_data_test
+  - name: test_objects2
+    source: spark_source
+    database: dqfw_test
+    table: simple_data_test_2
+  - name: test_objects3
+    source: spark_source
+    database: dqfw_test
+    table: simple_data_test_3
+    active: False
+
+
+metrics:
+  - name: spark_cloud_329.test.test_objects1.custom_sql
+    type: custom_sql
+    check_object : spark_cloud_329.test.test_objects1
+    parametres:
+      column: "rel_value"
+      sql: "SELECT COUNT({column}) FROM {schema}.{table} WHERE business_dt = {current_date}"
+      # Запрос к БД: SELECT COUNT(rel_value) FROM test.stantard_compare WHERE business_dt = '2023-08-01'
+  - name: spark_cloud_329.test.simple_data_test_2.row_count
+    type: row_count
+    check_object: spark_cloud_329.test.simple_data_test_2
+    parametres:
+      column: "rel_value"
+      where: "business_dt = '{current_year}/{current_month}/{current_date}'"
+      # Запрос к БД: SELECT COUNT(rel_value) FROM test.stantard_compare WHERE business_dt = '2023/08/01'
+  - name: spark_cloud_329.test.simple_data_test_3.row_count2
+    type: row_count
+    check_object: spark_cloud_329.test.simple_data_test_3
+    parametres:
+      column: "rel_value"
+      where: "business_dt = '{current_date_no_sep}'"
+      # Запрос к БД: SELECT COUNT(rel_value) FROM test.stantard_compare WHERE business_dt = '20230801'
+
+
+compares:
+  - name: compare_two_metric_absolute
+    type: absolute_ratio
+    parametres:
+      min_value: 100
+      max_value: 110 # Бесконечность можно выставить при помощи слова 'inf'
+      reference_metric: spark_cloud_329.test.simple_data_test_3.row_count2
+    metric: spark_cloud_329.test.simple_data_test_2.row_count
+    description: "Сравнение значения метрки spark_msisdn_count_value_simple_data с некторым числом"
+  - name: compare_two_metric_delta
+    type: percent_delta
+    parametres:
+      min_value: 110
+      max_value: 120 # Бесконечность можно выставить при помощи слова 'inf'
+      date_reference: 'PREV'
+      reference_metric: spark_cloud_329.test.simple_data_test_3.row_count2
+    metric: spark_cloud_329.test.simple_data_test_2.row_count
+  - name: spark_compare_with_static_values
+    type: compare_with_static_values
+    parametres:
+      min_value: 90
+      max_value: 110
+    metric: spark_cloud_329.test.test_objects1.custom_sql
+
+
+groups:
+  # группа объединяющая проверки по тестовой таблице
+  - name: test_check
+    compares:
+      - compare_two_metric_absolute
+      - compare_two_metric_delta
+      - park_compare_with_static_values
+
